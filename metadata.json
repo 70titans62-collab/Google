@@ -1,0 +1,6 @@
+{
+  "name": "CSI",
+  "description": "Creation S Irfan (HOMECRAFT 3D) — Architectural 2D floor planning, 3D modeling, interior/electrical/plumbing design, AI assistant, material estimation, and cloud sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

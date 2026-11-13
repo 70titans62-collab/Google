@@ -1,0 +1,207 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Hardened Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    // 3. Validation Helpers
+    function isValidCloudProject(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'name', 'category', 'isFavorite', 'isDeleted',
+          'deletedAtMillis', 'version', 'floorCount', 'folderPath',
+          'projectJson', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId', 'name', 'category', 'isFavorite', 'isDeleted',
+          'deletedAtMillis', 'version', 'floorCount', 'folderPath',
+          'projectJson', 'createdAt', 'updatedAt'
+        ]) &&
+        data.userId is string && data.userId == userId &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+        data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+        data.isFavorite is bool &&
+        data.isDeleted is bool &&
+        data.deletedAtMillis is int && data.deletedAtMillis >= 0 &&
+        data.version is int && data.version >= 1 &&
+        data.floorCount is int && data.floorCount >= 1 && data.floorCount <= 10 &&
+        data.folderPath is string && data.folderPath.size() >= 1 && data.folderPath.size() <= 200 &&
+        data.projectJson is string && data.projectJson.size() >= 2 && data.projectJson.size() <= 900000 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidProjectVersion(data, userId, projectId) {
+      return data.keys().hasAll([
+          'userId', 'projectId', 'versionNumber', 'summary', 'snapshotJson', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId', 'projectId', 'versionNumber', 'summary', 'snapshotJson', 'createdAt'
+        ]) &&
+        data.userId is string && data.userId == userId &&
+        data.projectId is string && data.projectId == projectId &&
+        data.versionNumber is int && data.versionNumber >= 1 &&
+        data.summary is string && data.summary.size() >= 1 && data.summary.size() <= 200 &&
+        data.snapshotJson is string && data.snapshotJson.size() >= 2 && data.snapshotJson.size() <= 900000 &&
+        isValidTimestamp(data.createdAt);
+    }
+
+    function isValidSharedDesign(data) {
+      return data.keys().hasAll([
+          'ownerId', 'ownerDisplayName', 'projectId', 'projectName',
+          'isPublic', 'permission', 'passwordProtected', 'passwordHash',
+          'expiresAtMillis', 'revoked', 'collaboratorUids', 'snapshotJson',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'ownerDisplayName', 'projectId', 'projectName',
+          'isPublic', 'permission', 'passwordProtected', 'passwordHash',
+          'expiresAtMillis', 'revoked', 'collaboratorUids', 'snapshotJson',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.ownerDisplayName is string && data.ownerDisplayName.size() >= 1 && data.ownerDisplayName.size() <= 80 &&
+        data.projectId is string && isValidId(data.projectId) &&
+        data.projectName is string && data.projectName.size() >= 1 && data.projectName.size() <= 120 &&
+        data.isPublic is bool &&
+        data.permission in ['VIEW_ONLY', 'EDITABLE'] &&
+        data.passwordProtected is bool &&
+        data.passwordHash is string && data.passwordHash.size() <= 128 &&
+        data.expiresAtMillis is int && data.expiresAtMillis >= 0 &&
+        data.revoked is bool &&
+        data.collaboratorUids is list && data.collaboratorUids.size() <= 20 &&
+        (data.collaboratorUids.size() == 0 || data.collaboratorUids[0] is string) &&
+        data.snapshotJson is string && data.snapshotJson.size() >= 2 && data.snapshotJson.size() <= 900000 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidShareComment(data, shareId) {
+      return data.keys().hasAll(['shareId', 'authorId', 'authorName', 'text', 'createdAt']) &&
+        data.keys().hasOnly(['shareId', 'authorId', 'authorName', 'text', 'createdAt']) &&
+        data.shareId is string && data.shareId == shareId &&
+        data.authorId is string && data.authorId == request.auth.uid &&
+        data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80 &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 500 &&
+        isValidTimestamp(data.createdAt);
+    }
+
+    function canAccessShareDoc(shareData) {
+      return shareData.ownerId == request.auth.uid ||
+        (shareData.revoked == false &&
+          (shareData.isPublic == true || request.auth.uid in shareData.collaboratorUids));
+    }
+
+    // 4. User-Scoped Projects & Backups
+    match /users/{userId}/projects/{projectId} {
+      allow list: if isSignedIn() && request.auth.uid == userId;
+      allow get: if isSignedIn() && isValidId(projectId) && request.auth.uid == userId;
+      allow create: if isSignedIn() &&
+        isValidId(projectId) &&
+        request.auth.uid == userId &&
+        isValidCloudProject(incoming(), userId);
+      allow update: if isSignedIn() &&
+        isValidId(projectId) &&
+        request.auth.uid == userId &&
+        isValidCloudProject(incoming(), userId) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'category', 'isFavorite', 'isDeleted', 'deletedAtMillis',
+          'version', 'floorCount', 'folderPath', 'projectJson', 'updatedAt'
+        ]);
+      allow delete: if isSignedIn() && isValidId(projectId) && request.auth.uid == userId;
+
+      match /versions/{versionId} {
+        allow list: if isSignedIn() && request.auth.uid == userId;
+        allow get: if isSignedIn() && isValidId(projectId) && isValidId(versionId) && request.auth.uid == userId;
+        allow create: if isSignedIn() &&
+          isValidId(projectId) &&
+          isValidId(versionId) &&
+          request.auth.uid == userId &&
+          isValidProjectVersion(incoming(), userId, projectId) &&
+          exists(/databases/$(database)/documents/users/$(userId)/projects/$(projectId));
+        allow update: if false;
+        allow delete: if isSignedIn() && isValidId(projectId) && isValidId(versionId) && request.auth.uid == userId;
+      }
+    }
+
+    // 5. Shared Designs & Collaboration
+    match /shared_designs/{shareId} {
+      allow list: if isSignedIn() && (
+        existing().ownerId == request.auth.uid ||
+        (existing().isPublic == true && existing().revoked == false)
+      );
+      allow get: if isSignedIn() && isValidId(shareId) && canAccessShareDoc(existing());
+      allow create: if isSignedIn() &&
+        isValidId(shareId) &&
+        incoming().ownerId == request.auth.uid &&
+        isValidSharedDesign(incoming());
+      allow update: if isSignedIn() &&
+        isValidId(shareId) &&
+        isValidSharedDesign(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().projectId == existing().projectId &&
+        incoming().createdAt == existing().createdAt && (
+          // Action 1: Owner manages share settings or updates snapshot
+          (existing().ownerId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'projectName', 'isPublic', 'permission', 'passwordProtected',
+              'passwordHash', 'expiresAtMillis', 'revoked', 'collaboratorUids',
+              'snapshotJson', 'updatedAt'
+            ])) ||
+          // Action 2: Authorized collaborator updates snapshot when EDITABLE and not revoked
+          (existing().revoked == false &&
+            existing().permission == 'EDITABLE' &&
+            (existing().isPublic == true || request.auth.uid in existing().collaboratorUids) &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['snapshotJson', 'updatedAt']))
+        );
+      allow delete: if isSignedIn() && isValidId(shareId) && existing().ownerId == request.auth.uid;
+
+      match /comments/{commentId} {
+        allow list: if isSignedIn() &&
+          exists(/databases/$(database)/documents/shared_designs/$(shareId)) &&
+          canAccessShareDoc(get(/databases/$(database)/documents/shared_designs/$(shareId)).data);
+        allow get: if isSignedIn() &&
+          isValidId(commentId) &&
+          exists(/databases/$(database)/documents/shared_designs/$(shareId)) &&
+          canAccessShareDoc(get(/databases/$(database)/documents/shared_designs/$(shareId)).data);
+        allow create: if isSignedIn() &&
+          isValidId(shareId) &&
+          isValidId(commentId) &&
+          isValidShareComment(incoming(), shareId) &&
+          exists(/databases/$(database)/documents/shared_designs/$(shareId)) &&
+          canAccessShareDoc(get(/databases/$(database)/documents/shared_designs/$(shareId)).data);
+        allow update: if false;
+        allow delete: if isSignedIn() &&
+          isValidId(shareId) &&
+          isValidId(commentId) && (
+            existing().authorId == request.auth.uid ||
+            get(/databases/$(database)/documents/shared_designs/$(shareId)).data.ownerId == request.auth.uid
+          );
+      }
+    }
+  }
+}

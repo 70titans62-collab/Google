@@ -1,0 +1,251 @@
+{
+  "entities": {
+    "CloudProject": {
+      "title": "CloudProject",
+      "description": "User architectural project and cloud backup record in CSI HOMECRAFT 3D.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "name": {
+          "type": "string",
+          "description": "Project title."
+        },
+        "category": {
+          "type": "string",
+          "description": "Project category (e.g. RESIDENTIAL, VILLA, APARTMENT)."
+        },
+        "isFavorite": {
+          "type": "boolean",
+          "description": "Whether project is starred as favorite."
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "Whether project is in the recycle bin."
+        },
+        "deletedAtMillis": {
+          "type": "integer",
+          "description": "Epoch milliseconds when moved to recycle bin, or 0."
+        },
+        "version": {
+          "type": "integer",
+          "description": "Monotonically increasing project revision number."
+        },
+        "floorCount": {
+          "type": "integer",
+          "description": "Number of floors in the design."
+        },
+        "folderPath": {
+          "type": "string",
+          "description": "Organized cloud backup folder path."
+        },
+        "projectJson": {
+          "type": "string",
+          "description": "Serialized full 2D/3D/MEP project geometry JSON."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "category",
+        "isFavorite",
+        "isDeleted",
+        "deletedAtMillis",
+        "version",
+        "floorCount",
+        "folderPath",
+        "projectJson",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ProjectVersion": {
+      "title": "ProjectVersion",
+      "description": "Immutable historical version snapshot for a user project.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Parent project ID."
+        },
+        "versionNumber": {
+          "type": "integer",
+          "description": "Version sequence number."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Summary of changes in this version."
+        },
+        "snapshotJson": {
+          "type": "string",
+          "description": "Serialized project snapshot JSON."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of snapshot creation."
+        }
+      },
+      "required": [
+        "userId",
+        "projectId",
+        "versionNumber",
+        "summary",
+        "snapshotJson",
+        "createdAt"
+      ]
+    },
+    "SharedDesign": {
+      "title": "SharedDesign",
+      "description": "Shared design link with access control, password hash, expiry, and collaboration mode.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "ownerDisplayName": {
+          "type": "string",
+          "description": "Owner display name (no PII email)."
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Source project ID."
+        },
+        "projectName": {
+          "type": "string",
+          "description": "Shared project title."
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "True if publicly discoverable/openable by signed-in link holders."
+        },
+        "permission": {
+          "type": "string",
+          "enum": ["VIEW_ONLY", "EDITABLE"],
+          "description": "Collaboration permission mode."
+        },
+        "passwordProtected": {
+          "type": "boolean",
+          "description": "Whether a password is required to unlock the shared design."
+        },
+        "passwordHash": {
+          "type": "string",
+          "description": "SHA-256 hex digest of password or empty string."
+        },
+        "expiresAtMillis": {
+          "type": "integer",
+          "description": "Epoch milliseconds when link expires, or 0 for never."
+        },
+        "revoked": {
+          "type": "boolean",
+          "description": "True if the owner revoked the share link."
+        },
+        "collaboratorUids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Bounded list of allowed collaborator UIDs."
+        },
+        "snapshotJson": {
+          "type": "string",
+          "description": "Serialized project geometry JSON."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "ownerId",
+        "ownerDisplayName",
+        "projectId",
+        "projectName",
+        "isPublic",
+        "permission",
+        "passwordProtected",
+        "passwordHash",
+        "expiresAtMillis",
+        "revoked",
+        "collaboratorUids",
+        "snapshotJson",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ShareComment": {
+      "title": "ShareComment",
+      "description": "Feedback comment on a shared architectural design.",
+      "type": "object",
+      "properties": {
+        "shareId": {
+          "type": "string",
+          "description": "Parent shared design document ID."
+        },
+        "authorId": {
+          "type": "string",
+          "description": "Comment author UID."
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Comment author display name."
+        },
+        "text": {
+          "type": "string",
+          "description": "Comment content."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        }
+      },
+      "required": [
+        "shareId",
+        "authorId",
+        "authorName",
+        "text",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/CloudProject" },
+      "description": "User-scoped architectural projects and organized cloud backups."
+    },
+    "/users/{userId}/projects/{projectId}/versions/{versionId}": {
+      "schema": { "$ref": "#/entities/ProjectVersion" },
+      "description": "Version history snapshots for a user project."
+    },
+    "/shared_designs/{shareId}": {
+      "schema": { "$ref": "#/entities/SharedDesign" },
+      "description": "Shareable architectural design links and collaboration state."
+    },
+    "/shared_designs/{shareId}/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/ShareComment" },
+      "description": "Comments and review feedback on a shared design."
+    }
+  }
+}
